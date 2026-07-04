@@ -1,197 +1,95 @@
-lints.workspace = true
+# gitoxide — LOCAL DIVERGED FORK, library crates only.
+#
+# This fork has permanently diverged from GitoxideLabs/gitoxide's workspace shape. It exists to
+# provide native, networking-optional git functionality (repo discovery, ref resolution, object
+# reading) without the CLI, GUI tools, fuzz targets, or full upstream dependency surface — see
+# DIVERGENCE.md for the full rationale and provenance.
+#
+# What's gone, permanently, relative to upstream: the `gitoxide`/`ein` CLI binaries and their
+# entire dependency tree (gitoxide-core, prodash, clap, and everything only they needed),
+# gix-tui, gix-tix, gix-fsck, gix-lfs, gix-rebase, gix-sequencer, gix-macros, gix-note,
+# gix-fetchhead, and both test harnesses (tests/it, tests/tools) and every crate's own tests/ and
+# fuzz/ directories. None of it is needed to use `gix` as a library, and keeping it meant every
+# build validated manifests for code nobody here uses or reviews.
+#
+# What's still here: 57 crates — the real dependency closure for
+# `gix = { default-features = false, features = ["sha1", "revision"] }` (34 crates), plus the
+# smaller set gix's own manifest declares as `optional = true` path dependencies and therefore
+# requires to exist on disk even when unused (this includes the entire networking stack —
+# gix-protocol, gix-transport, gix-credentials — present but NEVER compiled under this feature
+# set; verify with `cargo tree`).
+#
+# Tracking upstream: `git remote add upstream https://github.com/GitoxideLabs/gitoxide.git`, then
+# `git log <this-branch>..upstream/main -- <crate-name>/` shows what's changed in any specific
+# crate since divergence, e.g. `git log local_profile..upstream/main -- gix-hash/` for anything
+# that's landed in gix-hash since this fork split off. Pull in fixes deliberately, crate by crate,
+# rather than re-merging the whole upstream tree.
 
-[package]
-name = "gitoxide"
-description = "A command-line application for interacting with git repositories"
-repository = "https://github.com/GitoxideLabs/gitoxide"
-authors = ["Sebastian Thiel <sebastian.thiel@icloud.com>"]
-edition = "2024"
-license = "MIT OR Apache-2.0"
-version = "0.55.0"
-# Rust 1.85 is required so hash-related dependencies can use Rust 2024 crates,
-# notably `sha2` 0.11 and `hashbrown` 0.17.
-rust-version = "1.85"
-default-run = "gix"
-include = ["/src/**/*", "/build.rs", "/LICENSE-*", "/README.md"]
+[workspace]
 resolver = "2"
+members = [
+    "gix",
+    "tests/tools",
+    "gix-actor",
+    "gix-archive",
+    "gix-attributes",
+    "gix-bitmap",
+    "gix-blame",
+    "gix-chunk",
+    "gix-command",
+    "gix-commitgraph",
+    "gix-config",
+    "gix-config-value",
+    "gix-credentials",
+    "gix-date",
+    "gix-diff",
+    "gix-dir",
+    "gix-discover",
+    "gix-error",
+    "gix-features",
+    "gix-filter",
+    "gix-fs",
+    "gix-glob",
+    "gix-hash",
+    "gix-hashtable",
+    "gix-ignore",
+    "gix-imara-diff",
+    "gix-index",
+    "gix-lock",
+    "gix-mailmap",
+    "gix-merge",
+    "gix-negotiate",
+    "gix-object",
+    "gix-odb",
+    "gix-pack",
+    "gix-packetline",
+    "gix-path",
+    "gix-pathspec",
+    "gix-prompt",
+    "gix-protocol",
+    "gix-quote",
+    "gix-ref",
+    "gix-refspec",
+    "gix-revision",
+    "gix-revwalk",
+    "gix-sec",
+    "gix-shallow",
+    "gix-status",
+    "gix-submodule",
+    "gix-tempfile",
+    "gix-trace",
+    "gix-transport",
+    "gix-traverse",
+    "gix-url",
+    "gix-utils",
+    "gix-validate",
+    "gix-worktree",
+    "gix-worktree-state",
+    "gix-worktree-stream",
+]
 
-[[bin]]
-name = "ein"
-path = "src/ein.rs"
-doc = false
-test = false
-doctest = false
+[workspace.dependencies]
 
-[[bin]]
-name = "gix"
-path = "src/gix.rs"
-doc = false
-test = false
-doctest = false
-
-[features]
-default = ["max"]
-
-#! ### Build Configuration
-#! These combine common choices of building blocks to represent typical builds.
-
-## Everything, all at once.
-##
-## As fast as possible, tracing, with TUI progress, progress line rendering with autoconfiguration, all transports based on their most mature implementation (HTTP), all `ein` tools, CLI colors and local-time support, JSON output, regex support for rev-specs.
-## Can be amended with the `http-client-curl-rustls` feature to avoid `openssl` as backend.
-##
-## ### Note
-##
-## When used in conjunction with `http-client-curl-rustls`, the `openssl` crates will still be compiled, but won't be used. To bypass this, disable
-## default dependencies and specify the features yourself.
-max = ["hashes", "max-control", "fast", "gitoxide-core-tools-query", "gitoxide-core-tools-corpus", "gitoxide-core-blocking-client", "http-client-curl-openssl"]
-
-## Like `max`, but only Rust is allowed.
-##
-## This is the most compatible build as it won't need a C compiler or C toolchains to build. Thanks to zlib-rs, you don't have to trade off between compatibility and performance.
-##
-## This uses Rust's HTTP implementation.
-##
-## As fast as possible, with TUI progress, progress line rendering with auto-configuration, all transports available but less mature pure Rust HTTP implementation, all `ein` tools, CLI colors and local-time support, JSON output, regex support for rev-specs.
-max-pure = ["hashes", "max-control", "http-client-reqwest", "gitoxide-core-blocking-client"]
-
-## Like `max`, but with more control for configuration. See the *Package Maintainers* headline for more information.
-## Needs to chose its own hash(es).
-max-control = ["tracing", "fast", "pretty-cli", "gitoxide-core-tools", "prodash-render-line", "prodash-render-tui", "prodash/render-line-autoconfigure", "gix/revparse-regex"]
-
-## All the good stuff, with less fanciness for smaller binaries.
-##
-## As fast as possible, progress line rendering, all transports based on their most mature implementation (HTTP), all `ein` tools, CLI colors and local-time support, JSON output.
-lean = ["hashes", "fast", "tracing", "pretty-cli", "http-client-curl-openssl", "gitoxide-core-tools-query", "gitoxide-core-tools-corpus", "gitoxide-core-tools", "gitoxide-core-blocking-client", "prodash-render-line"]
-
-## The smallest possible build, best suitable for small single-core machines.
-##
-## This build is essentially limited to local operations without any fanciness. It does not have `gix clone`.
-##
-## Optimized for size, no parallelism thus much slower, progress line rendering.
-small = ["hashes", "pretty-cli", "prodash-render-line", "is-terminal"]
-
-## Like lean, but uses Rusts async implementations for networking.
-##
-## This build is more of a demonstration showing how async can work with `gitoxide`, which generally is blocking. This also means that the selection of async transports
-## is very limited to only HTTP (without typical `git` configuration) and git over TCP like provided by the `git daemon`.
-##
-## As fast as possible, progress line rendering, less featureful HTTP (pure Rust) and only `git-daemon` support, all `ein` tools, CLI colors and local-time support, JSON output.
-##
-## Due to async client-networking not being implemented for most transports, this one supports only the 'git+tcp' and HTTP transport.
-## It uses, however, a fully asynchronous networking implementation which can serve a real-world example on how to implement custom async transports.
-lean-async = ["hashes", "fast", "tracing", "pretty-cli", "gitoxide-core-tools", "gitoxide-core-tools-query", "gitoxide-core-tools-corpus", "gitoxide-core-async-client", "prodash-render-line"]
-
-#! ### Package Maintainers
-#! `*-control` features leave it to you to configure C libraries, involving choices for HTTP transport implementation.
-#!
-#! Additional features *can* be provided with `--features` and are handled by the [`gix-features` crate](https://docs.rs/gix-features/latest).
-#! Note that only one HTTP transport can be enabled at a time. See the *Building Blocks for mutually exclusive networking* headline.
-
-#! ### Building Blocks
-#! Typical combinations of features of our dependencies, some of which are referred to in the `gitoxide` crate's code for conditional compilation.
-
-## Provide support for all known hashes. If this isn't enabled, select an individual hash algorithms.
-hashes = ["sha1", "sha256"]
-## Enable support for the SHA-1 hash throughout the `gix` crate.
-sha1 = ["gix/sha1"]
-## Enable support for the SHA-256 hash throughout the `gix` crate.
-sha256 = ["gix/sha256"]
-
-## Makes the crate execute as fast as possible by supporting parallel computation of otherwise long-running functions.
-## If disabled, the binary will be visibly smaller.
-fast = ["gix/max-performance", "gix/comfort"]
-
-## Deprecated: identical to `fast`, as the fastest zlib backend is now the pure-Rust zlib-rs.
-fast-safe = ["fast"]
-
-## Enable tracing in `gitoxide-core`.
-tracing = ["dep:tracing-forest", "dep:tracing-subscriber", "dep:tracing", "gix-features/tracing", "gix-features/tracing-detail"]
-
-## Use `clap` 3.0 to build the prettiest, best documented and most user-friendly CLI at the expense of binary size.
-## Provides a terminal user interface for detailed and exhaustive progress.
-## Provides a line renderer for leaner progress display, without the need for a full-blown TUI.
-pretty-cli = ["gitoxide-core/serde", "prodash/progress-tree", "prodash/progress-tree-log", "prodash/local-time", "env_logger/humantime", "env_logger/color", "env_logger/auto-color"]
-
-## The `--verbose` flag will be powered by an interactive progress mechanism that doubles as log as well as interactive progress
-## that appears after a short duration.
-prodash-render-line-crossterm = ["prodash-render-line", "prodash/render-line-crossterm", "prodash/signal-hook", "is-terminal", "crosstermion"]
-
-## Progress reporting with a TUI, can then be enabled with the `--progress` flag.
-prodash-render-tui = ["prodash/render-tui", "prodash/render-tui-crossterm", "gix/progress-tree", "futures-lite"]
-
-## Progress reporting by visually drawing lines into the terminal without switching to an alternate window.
-prodash-render-line = ["prodash/render-line", "prodash-render-line-crossterm", "gix/progress-tree"]
-
-## Prints statistical information to inform about cache efficiency when those are dropped.
-## Use this as a way to understand if bigger caches actually produce greater yields.
-cache-efficiency-debug = ["gix-features/cache-efficiency-debug"]
-
-##  A way to enable most `gitoxide-core` tools found in `ein tools`, namely `organize` and `estimate hours`.
-gitoxide-core-tools = ["gitoxide-core/organize", "gitoxide-core/estimate-hours", "gitoxide-core-tools-archive", "gitoxide-core-tools-clean"]
-
-## A program to perform analytics on a `git` repository, using an auto-maintained sqlite database
-gitoxide-core-tools-query = ["gitoxide-core/query"]
-
-## A program to run algorithms on a corpus of repositories, recording each run for later comparison.
-gitoxide-core-tools-corpus = ["gitoxide-core/corpus"]
-
-## A sub-command to generate archive from virtual worktree checkouts.
-gitoxide-core-tools-archive = ["gitoxide-core/archive"]
-
-## A sub-command to clean the worktree from untracked and ignored files.
-gitoxide-core-tools-clean = ["gitoxide-core/clean"]
-
-#! ### Building Blocks for mutually exclusive networking
-#! Blocking and async features are mutually exclusive and cause a compile-time error. This also means that `cargo … --all-features` will fail.
-#! Within each section, features can be combined.
-#!
-#! #### Blocking
-#! The backends are mutually exclusive, e.g. choose either `curl` or `request`.
-#!
-## Use blocking client networking.
-gitoxide-core-blocking-client = ["gitoxide-core/blocking-client"]
-## Support synchronous 'http' and 'https' transports (e.g. for clone, fetch and push) using **curl**.
-http-client-curl = ["gix/blocking-http-transport-curl"]
-## Implies `http-client-curl` and configures `curl` to use the `rust-tls` backend.
-http-client-curl-rustls = ["gix/blocking-http-transport-curl-rustls"]
-## Implies `http-client-curl` and configures `curl` to use the `openssl` backend.
-http-client-curl-openssl = ["gix/blocking-http-transport-curl-openssl"]
-## Support synchronous 'http' and 'https' transports (e.g. for clone, fetch and push) using **reqwest**.
-http-client-reqwest = ["gix/blocking-http-transport-reqwest-rust-tls"]
-
-#! #### Async
-#!
-## Use async client networking.
-gitoxide-core-async-client = ["gitoxide-core/async-client", "futures-lite"]
-
-[dependencies]
-anyhow = "1.0.98"
-
-gitoxide-core = { version = "^0.59.0", path = "gitoxide-core" }
-gix-features = { version = "^0.48.1", path = "gix-features" }
-gix = { version = "^0.85.0", path = "gix", default-features = false }
-
-clap = { version = "4.5.42", features = ["derive", "cargo"] }
-clap_complete = "4.5.55"
-prodash = { version = "31.0.0", optional = true }
-is-terminal = { version = "0.4.0", optional = true }
-env_logger = { version = "0.11.8", default-features = false }
-crosstermion = { version = "0.16.0", optional = true, default-features = false }
-futures-lite = { version = "2.1.0", optional = true }
-
-# for 'tracing'
-tracing-forest = { version = "0.1.5", features = ["serde"], optional = true }
-tracing-subscriber = { version = "0.3.17", optional = true }
-tracing = { version = "0.1.37", optional = true }
-
-# for config-tree
-terminal_size = "0.4.2"
-
-# Avoid pre-compiled binaries, see https://github.com/serde-rs/serde/issues/2538 and https://github.com/serde-rs/serde/pull/2590
-serde_derive = ">=1.0.185"
-
-document-features = { version = "0.2.0", optional = true }
 [profile.dev.package]
 insta.opt-level = 3
 similar.opt-level = 3
@@ -225,97 +123,6 @@ strip = "symbols"
 [profile.bench]
 debug = 1
 strip = "none"
-
-[workspace]
-members = [
-    "gix-actor",
-    "gix-url",
-    "gix-hash",
-    "gix-validate",
-    "gix-ref",
-    "gix-command",
-    "gix-config",
-    "gix-config-value",
-    "gix-discover",
-    "gix-features",
-    "gix-trace",
-    "gix-commitgraph",
-    "gix-chunk",
-    "gix-error",
-    "gix-quote",
-    "gix-object",
-    "gix-glob",
-    "gix-diff",
-    "gix-imara-diff",
-    "gix-merge",
-    "gix-date",
-    "gix-traverse",
-    "gix-dir",
-    "gix-index",
-    "gix-bitmap",
-    "gix-worktree",
-    "gix-worktree-state",
-    "gix-status",
-    "gix-revision",
-    "gix-packetline",
-    "gix-mailmap",
-    "gix-macros",
-    "gix-note",
-    "gix-negotiate",
-    "gix-fetchhead",
-    "gix-prompt",
-    "gix-filter",
-    "gix-sec",
-    "gix-lfs",
-    "gix-rebase",
-    "gix-sequencer",
-    "gix-submodule",
-    "gix-transport",
-    "gix-credentials",
-    "gix-protocol",
-    "gix-pack",
-    "gix-odb",
-    "gix-tempfile",
-    "gix-lock",
-    "gix-attributes",
-    "gix-ignore",
-    "gix-pathspec",
-    "gix-refspec",
-    "gix-path",
-    "gix-utils",
-    "gix-fs",
-    "gix-blame",
-    "gix",
-    "gitoxide-core",
-    "gix-hashtable",
-    "gix-tui",
-    "gix-tix",
-    "gix-archive",
-    "gix-worktree-stream",
-    "gix-revwalk",
-    "gix-fsck",
-    "tests/tools",
-    "tests/it",
-    "gix-shallow"
-]
-
-[workspace.dependencies]
-
-
-[package.metadata.docs.rs]
-features = ["document-features", "max"]
-
-[package.metadata.cargo-machete]
-ignored = [
-    # Feature-only dependency selected through `prodash-render-line-crossterm` wiring.
-    "crosstermion",
-    # Pinned direct dependency to avoid precompiled binaries; intentionally not referenced in code.
-    "serde_derive",
-]
-
-[package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/v{ version }/gitoxide-max-pure-v{ version }-{ target }{ archive-suffix }"
-bin-dir = "gitoxide-max-pure-v{ version }-{ target }/{ bin }{ binary-ext }"
 
 [workspace.lints.rust]
 # TODO: enable this
